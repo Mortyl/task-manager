@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownedBoards   Board[]       @relation("BoardOwner")
+  boardMembers  BoardMember[]
+  assignedCards Card[]        @relation("CardAssignee")
+  createdCards  Card[]        @relation("CardCreator")
+}
+
+model Board {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerId String
+  owner   User   @relation("BoardOwner", fields: [ownerId], references: [id])
+
+  columns Column[]
+  members BoardMember[]
+}
+
+model BoardMember {
+  id        String   @id @default(cuid())
+  role      String   @default("member")
+  createdAt DateTime @default(now())
+
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, userId])
+}
+
+model Column {
+  id        String   @id @default(cuid())
+  title     String
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  cards Card[]
+}
+
+model Card {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  order       Int
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  columnId String
+  column   Column @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  creatorId String
+  creator   User   @relation("CardCreator", fields: [creatorId], references: [id])
+
+  assigneeId String?
+  assignee   User?   @relation("CardAssignee", fields: [assigneeId], references: [id])
+}
