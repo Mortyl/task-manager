@@ -3,9 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { getTokenFromHeader, verifyToken } from "@/lib/auth";
 
 export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
+    req: Request,
+    { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const token = getTokenFromHeader(req.headers.get("authorization"));
     if (!token) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
@@ -14,7 +15,7 @@ export async function GET(
     if (!payload) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
 
     const board = await prisma.board.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         owner: { select: { id: true, name: true, email: true } },
         members: {
@@ -55,9 +56,10 @@ export async function GET(
 }
 
 export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
+    req: Request,
+    { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const token = getTokenFromHeader(req.headers.get("authorization"));
     if (!token) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
@@ -68,7 +70,7 @@ export async function PATCH(
     const { title, description } = await req.json();
 
     const board = await prisma.board.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         ...(title && { title }),
         ...(description !== undefined && { description }),
@@ -83,9 +85,10 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  req: Request,
-  { params }: { params: { id: string } }
+    req: Request,
+    { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const token = getTokenFromHeader(req.headers.get("authorization"));
     if (!token) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
@@ -93,13 +96,13 @@ export async function DELETE(
     const payload = verifyToken(token);
     if (!payload) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
 
-    const board = await prisma.board.findUnique({ where: { id: params.id } });
+    const board = await prisma.board.findUnique({ where: { id: id } });
 
     if (!board || board.ownerId !== payload.userId) {
       return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
     }
 
-    await prisma.board.delete({ where: { id: params.id } });
+    await prisma.board.delete({ where: { id: id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

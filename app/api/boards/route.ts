@@ -22,7 +22,7 @@ export async function GET(req: Request) {
         members: { include: { user: { select: { id: true, name: true, email: true } } } },
         _count: { select: { columns: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "asc" },
     });
 
     return NextResponse.json(boards);
