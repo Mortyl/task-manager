@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { io, Socket } from "socket.io-client";
 import { useDroppable } from "@dnd-kit/core";
 import CardModal from "@/components/board/CardModal";
+import ActivityFeed from "@/components/board/ActivityFeed";
 import {
   DndContext,
   DragEndEvent,
@@ -163,7 +164,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   const [activeCard, setActiveCard] = useState<Card | null>(null);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [selectedColumnTitle, setSelectedColumnTitle] = useState("");
-
+  const [dragFromColumn, setDragFromColumn] = useState<string>("");
   const sensors = useSensors(
       useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
@@ -269,6 +270,10 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
     const { active } = event;
     if (active.data.current?.type === "card") {
       setActiveCard(active.data.current.card);
+      const fromCol = board?.columns.find((col) =>
+          col.cards.some((c) => c.id === active.id)
+      );
+      setDragFromColumn(fromCol?.title ?? "");
     }
   };
 
@@ -342,6 +347,13 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
       });
 
       if (res.ok) {
+        const movedCard = activeColumn.cards.find((c) => c.id === activeId);
+        await logActivity("card:moved", {
+          cardTitle: movedCard?.title,
+          fromColumn: dragFromColumn,
+          toColumn: activeColumn.title,
+        });
+
         socketRef.current?.emit("card:moved", {
           cardId: activeId,
           fromColumnId: activeColumn.id,
@@ -353,6 +365,21 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const logActivity = async (action: string, data: {
+    cardTitle?: string;
+    fromColumn?: string;
+    toColumn?: string;
+  }) => {
+    await fetch("/api/activity", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ boardId: board?.id, action, ...data }),
+    });
   };
 
   const createCard = async (columnId: string) => {
@@ -371,6 +398,8 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
       const card = await res.json();
       if (!res.ok) return;
 
+      const col = board?.columns.find((c) => c.id === columnId);
+      await logActivity("card:created", { cardTitle: title, toColumn: col?.title });
       socketRef.current?.emit("card:created", { ...card, boardId: board?.id });
 
       setBoard((prev) => {
@@ -392,10 +421,14 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
 
   const deleteCard = async (cardId: string, columnId: string) => {
     try {
+      const cardToDelete = board?.columns.flatMap(c => c.cards).find(c => c.id === cardId);
+
       await fetch(`/api/cards?id=${cardId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      await logActivity("card:deleted", { cardTitle: cardToDelete?.title });
 
       socketRef.current?.emit("card:deleted", { cardId, columnId, boardId: board?.id });
 
@@ -430,6 +463,8 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
       });
       const column = await res.json();
       if (!res.ok) return;
+
+      await logActivity("column:created", { toColumn: newColumnTitle });
 
       socketRef.current?.emit("column:created", { ...column, boardId: board.id });
 
@@ -475,7 +510,8 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
         </span>
       </nav>
 
-      <div className="flex-1 overflow-x-auto p-6">
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex-1 overflow-x-auto p-6">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
@@ -622,35 +658,39 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
               </button>
             )}
 
-            {selectedCard && (
-                <CardModal
-                    card={selectedCard}
-                    columnTitle={selectedColumnTitle}
-                    token={token!}
-                    onClose={() => setSelectedCard(null)}
-                    onUpdate={(updated) => {
-                      setBoard((prev) => {
-                        if (!prev) return prev;
-                        return {
-                          ...prev,
-                          columns: prev.columns.map((col) => ({
-                            ...col,
-                            cards: col.cards.map((c) => c.id === updated.id ? { ...c, ...updated } : c),
-                          })),
-                        };
-                      });
-                      setSelectedCard(null);
-                    }}
-                    onDelete={deleteCard}
-                />
-            )}
           </div>
 
           <DragOverlay>
             {activeCard ? <CardOverlay card={activeCard} /> : null}
           </DragOverlay>
         </DndContext>
+        </div>
+        <ActivityFeed boardId={boardId} token={token!} />
       </div>
+
+      {selectedCard && (
+          <CardModal
+              card={selectedCard}
+              columnTitle={selectedColumnTitle}
+              token={token!}
+              onClose={() => setSelectedCard(null)}
+              onUpdate={(updated) => {
+                setBoard((prev) => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    columns: prev.columns.map((col) => ({
+                      ...col,
+                      cards: col.cards.map((c) => c.id === updated.id ? { ...c, ...updated } : c),
+                    })),
+                  };
+                });
+                setSelectedCard(null);
+              }}
+              onDelete={deleteCard}
+          />
+      )}
     </div>
   );
 }
+

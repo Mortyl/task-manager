@@ -11,6 +11,7 @@ model User {
   email     String   @unique
   name      String
   password  String
+  activities Activity[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -24,6 +25,7 @@ model Board {
   id          String   @id @default(cuid())
   title       String
   description String?
+  activities Activity[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -78,4 +80,19 @@ model Card {
 
   assigneeId String?
   assignee   User?   @relation("CardAssignee", fields: [assigneeId], references: [id])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  action    String
+  cardTitle String?
+  fromColumn String?
+  toColumn  String?
+  createdAt DateTime @default(now())
+
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 }
