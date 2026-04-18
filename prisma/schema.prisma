@@ -12,6 +12,7 @@ model User {
   name      String
   password  String
   activities Activity[]
+  sentInvites Invite[] @relation("InvitedBy")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -26,6 +27,7 @@ model Board {
   title       String
   description String?
   activities Activity[]
+  invites Invite[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -95,4 +97,17 @@ model Activity {
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
+}
+
+model Invite {
+  id        String   @id @default(cuid())
+  email     String
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  invitedById String
+  invitedBy   User   @relation("InvitedBy", fields: [invitedById], references: [id])
 }

@@ -7,6 +7,7 @@ import { io, Socket } from "socket.io-client";
 import { useDroppable } from "@dnd-kit/core";
 import CardModal from "@/components/board/CardModal";
 import ActivityFeed from "@/components/board/ActivityFeed";
+import MembersPanel from "@/components/board/MembersPanel";
 import {
   DndContext,
   DragEndEvent,
@@ -665,7 +666,15 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
           </DragOverlay>
         </DndContext>
         </div>
-        <ActivityFeed boardId={boardId} token={token!} />
+        <div className="flex-shrink-0 w-64 bg-white border-l border-gray-200 flex flex-col overflow-y-auto">
+          <MembersPanel
+              boardId={boardId}
+              token={token!}
+              ownerId={board.owner.id}
+              currentUserId={user?.id ?? ""}
+          />
+          <ActivityFeed boardId={boardId} token={token!} />
+        </div>
       </div>
 
       {selectedCard && (
@@ -681,7 +690,9 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
                     ...prev,
                     columns: prev.columns.map((col) => ({
                       ...col,
-                      cards: col.cards.map((c) => c.id === updated.id ? { ...c, ...updated } : c),
+                      cards: col.cards.map((c) =>
+                          c.id === updated.id ? { ...c, ...updated } : c
+                      ),
                     })),
                   };
                 });
